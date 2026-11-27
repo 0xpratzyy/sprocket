@@ -53,6 +53,13 @@ public final class SprocketExporter: @unchecked Sendable {
     public var webFramesRendered: Int { web.framesRendered }
     public var webPageLoads: Int { web.pageLoads }
 
+    /// Frames of the last `export` that were the same picture as the frame before them, so they were written again
+    /// without being drawn. A frame repeats when its node tree, with defaults written out, equals the previous frame's:
+    /// the renderer draws only from the tree and the asset files, so an equal tree is an equal picture. Films animated
+    /// on twos (each pose held for two frames) repeat about half their frames.
+    public var framesReused: Int { warningLock.withLock { reused } }
+    private var reused = 0
+
     /// Where this exporter keeps its web-layer pictures (tests look inside).
     var webCacheDirectoryForTests: URL { web.directory }
 
@@ -89,8 +96,15 @@ public final class SprocketExporter: @unchecked Sendable {
         try await prepare(frames: 0..<config.durationInFrames, report: prepareHandler)
         let audio = await MediaAudioMix.build(config: config, assets: assets, warn: { [self] in warn($0) })
         defer { videos.closeAll() }
+        let repeats = RepeatTracker()
+        warningLock.withLock { reused = 0 }
         try await ExportEngine.run(config: config, to: url, audio: audio, progress: progress) { [self] frame in
-            try makeImage(frame: frame)
+            let node = try resolvedNode(frame: frame)
+            if repeats.isRepeat(node) {
+                warningLock.withLock { reused += 1 }
+                return nil
+            }
+            return try makeImage(node: node)
         }
     }
 
@@ -103,7 +117,7 @@ public final class SprocketExporter: @unchecked Sendable {
         await videos.prepare(assets.keys)
         try await prepare(frames: frame..<(frame + 1), report: nil)
         defer { videos.closeAll() }
-        let image = try makeImage(frame: frame)
+        let image = try makeImage(node: try resolvedNode(frame: frame))
         guard let cg = SprocketRenderer.context.createCGImage(image, from: CGRect(x: 0, y: 0, width: config.width, height: config.height),
                                                             format: .RGBA8, colorSpace: ExportEngine.colorSpace)
         else { throw SprocketError(.render, "cannot rasterise frame \(frame)") }
@@ -177,14 +191,23 @@ public final class SprocketExporter: @unchecked Sendable {
         for w in script.drainWarnings() { warn(w) }
     }
 
-    private func makeImage(frame: Int) throws -> CIImage {
-        let node = try resolvedNode(frame: frame)
+    private func makeImage(node: Node) throws -> CIImage {
         noteFonts(node)
         let resources = try Snapshot(node: node, videos: videos, images: images, web: web, report: { [self] id, kind in
             guard noteUnusable(id, kind) else { return }
             warn(AssetCheck.message(id: id, kind: kind, url: assets[id]))
         })
         return renderer.render(node, config: script.config, resources: resources)
+    }
+
+    /// Remembers the previous frame's tree during an export. Called from the writer's one video queue, in frame order.
+    final class RepeatTracker: @unchecked Sendable {
+        private var previous: Node?
+        /// True when `node` equals the tree of the frame before; always records `node` as the new previous tree.
+        func isRepeat(_ node: Node) -> Bool {
+            defer { previous = node }
+            return previous == node
+        }
     }
 
     /// The pictures one frame needs, fetched before drawing.

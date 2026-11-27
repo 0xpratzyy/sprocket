@@ -87,7 +87,7 @@ Sprocket uses about one CPU core and the GPU. The browser-based engines spread o
 ## Known weak spots
 
 - **Heavy blur and shadows are the slow path.** 48 cards, each with a drop shadow, render at 35 fps.
-- **One core.** Frames are drawn one after another, and repeated frames are drawn again. Spreading work over cores and skipping repeats are the next improvements.
+- **One core.** Frames are drawn one after another. Spreading the work over cores is the next improvement. Repeated frames are already skipped: a frame whose tree equals the previous frame's is written again without being drawn.
 - **The `html()` web layer is slow on heavy pages:** about 0.9 s per 1080×1920 frame with many shadows and a big blur. Use native nodes whenever they can do the job.
 - **Fonts:** only fonts installed on the device. There is no `@font-face` loading yet.
 - Speeds above are from a Mac. **Phone numbers haven't been published yet.**
