@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" data-resolution="portrait">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1080, height=1920" />
+<script src="gsap.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+#root { position: relative; width: 1080px; height: 1920px; font-family: Helvetica, Arial, sans-serif; overflow: hidden; }
+.abs { position: absolute; }
+#cap { left: 0; width: 1080px; top: 1560px; text-align: center; color: #facc15; font-size: 120px; font-weight: 800; line-height: 1.2; }
+video { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="10" data-width="1080" data-height="1920">
+<video id="v" class="clip" data-start="0" data-duration="10" data-track-index="0" src="assets/clip.mp4" playsinline></video>
+<div class="abs" style="left:0;top:1500px;width:1080px;height:260px;background:rgba(0,0,0,0.55)"></div>
+<div id="cap" class="abs"></div>
+</div>
+<script>
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+const WORDS = "this is a quick test of captions on top of moving video footage".split(" ");
+const cap = document.getElementById("cap");
+function draw(t) {
+  const w = Math.min(WORDS.length - 1, Math.floor(t / 0.75));
+  const pop = easeOut(clamp((t - w * 0.75) / 0.2));
+  cap.textContent = WORDS[w]; cap.style.opacity = pop; cap.style.transform = "scale(" + (0.6 + 0.4 * pop) + ")";
+}
+const tl = gsap.timeline({ paused: true });
+const s = { t: 0 };
+tl.to(s, { t: 10, duration: 10, ease: "none", onUpdate: () => draw(s.t) }, 0);
+window.__timelines = window.__timelines || {};
+window.__timelines["main"] = tl;
+draw(0);
+tl.seek(0);
+</script>
+</body>
+</html>

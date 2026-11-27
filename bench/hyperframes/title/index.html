@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" data-resolution="portrait">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1080, height=1920" />
+<script src="gsap.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+#root { position: relative; width: 1080px; height: 1920px; font-family: Helvetica, Arial, sans-serif; overflow: hidden; }
+.abs { position: absolute; }
+#root { background: linear-gradient(to bottom, #0b1020, #1e1b4b); }
+.line { left: 0; width: 1080px; text-align: center; line-height: 1.2; }
+.dot { width: 200px; height: 200px; border-radius: 100px; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="10" data-width="1080" data-height="1920">
+<div id="t1" class="abs line" style="top:760px;color:#fff;font-size:160px;font-weight:800">LISBON</div>
+<div id="t2" class="abs line" style="top:960px;color:#c7d2fe;font-size:56px;font-weight:400">a weekend in light</div>
+<div id="d0" class="abs dot" style="background:#f43f5e"></div>
+<div id="d1" class="abs dot" style="background:#22d3ee"></div>
+<div id="d2" class="abs dot" style="background:#facc15"></div>
+<div id="bar" class="abs" style="left:0;top:1880px;height:16px;background:#fff"></div>
+</div>
+<script>
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+const t1 = document.getElementById("t1"), t2 = document.getElementById("t2"), bar = document.getElementById("bar");
+const dots = [0, 1, 2].map((i) => document.getElementById("d" + i));
+function draw(t) {
+  const f = Math.round(t * 30);
+  const p1 = easeOut(clamp((f - 10) / 30)), p2 = clamp((f - 30) / 30);
+  t1.style.opacity = p1; t1.style.transform = "translateY(" + 80 * (1 - p1) + "px)";
+  t2.style.opacity = p2;
+  dots.forEach((d, i) => { d.style.left = 90 + i * 320 + 60 * Math.sin(t * 1.5 + i) + "px"; d.style.top = 1300 + 40 * Math.cos(t * 2 + i) + "px"; });
+  bar.style.width = (1080 * Math.min(f, 299)) / 299 + "px";
+}
+const tl = gsap.timeline({ paused: true });
+const s = { t: 0 };
+tl.to(s, { t: 10, duration: 10, ease: "none", onUpdate: () => draw(s.t) }, 0);
+window.__timelines = window.__timelines || {};
+window.__timelines["main"] = tl;
+draw(0);
+tl.seek(0);
+</script>
+</body>
+</html>

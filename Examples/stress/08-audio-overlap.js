@@ -1,0 +1,1 @@
+composition({ width: 540, height: 960, fps: 30, durationInFrames: 180, audio: [{ src: "tone", volume: 0.5 }, { src: "beep", volume: 1, startFrame: 30 }, { src: "music", volume: 0.5, startFrame: 60, fadeIn: 0.5 }] }, function (frame, ctx) { return [video("c1", { time: frame / 30 }), text("f" + frame, { y: 900, size: 120, color: "#fff", stroke: "#000", strokeWidth: 6 })]; });

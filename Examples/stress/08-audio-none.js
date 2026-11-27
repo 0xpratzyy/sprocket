@@ -1,0 +1,1 @@
+composition({ width: 540, height: 960, fps: 30, durationInFrames: 60, audio: [] }, function (frame, ctx) { return [video("c1", { time: frame / 30 }), text("f" + frame, { y: 900, size: 120, color: "#fff", stroke: "#000", strokeWidth: 6 })]; });

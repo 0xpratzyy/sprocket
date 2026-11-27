@@ -1,0 +1,11 @@
+.build/
+.swiftpm/
+*.xcodeproj/
+DerivedData/
+.DS_Store
+Examples/stress/sheets/
+Examples/stress/out/
+bench/out/
+bench/**/node_modules/
+bench/**/public/clip.mp4
+bench/**/assets/clip.mp4
