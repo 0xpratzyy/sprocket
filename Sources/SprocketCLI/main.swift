@@ -299,7 +299,7 @@ func runJob() async throws {
         }
         noteWarnings(exporter.warnings)
         let s = Date().timeIntervalSince(start)
-        print("frames=\(config.durationInFrames) seconds=\(String(format: "%.2f", s)) fps=\(String(format: "%.1f", Double(config.durationInFrames) / max(s, 1e-6))) out=\(outURL.path)")
+        print("frames=\(config.durationInFrames) drawn=\(config.durationInFrames - exporter.framesReused) seconds=\(String(format: "%.2f", s)) fps=\(String(format: "%.1f", Double(config.durationInFrames) / max(s, 1e-6))) out=\(outURL.path)")
     }
 }
 

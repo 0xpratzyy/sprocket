@@ -3,7 +3,9 @@ import AVFoundation
 import CoreImage
 import CoreVideo
 
-/// Writes frames and sound to an .mp4. Knows nothing about scripts: `frame` returns the picture for a frame index.
+/// Writes frames and sound to an .mp4. Knows nothing about scripts: `frame` returns the picture for a frame index,
+/// or nil when the frame is the same picture as the one before it (then the last written buffer is appended again
+/// without drawing anything).
 enum ExportEngine {
     static func bitrate(width: Int, height: Int, fps: Int) -> Int {
         let scale = Double(width * height) / Double(1080 * 1920) * Double(max(1, fps)) / 30.0
@@ -14,7 +16,7 @@ enum ExportEngine {
 
     static func run(config: CompositionConfig, to url: URL, audio: MediaAudioMix?,
                     progress: (@Sendable (SprocketExporter.Progress) -> Void)?,
-                    frame: @escaping @Sendable (Int) throws -> CIImage) async throws {
+                    frame: @escaping @Sendable (Int) throws -> CIImage?) async throws {
         let w = config.width, h = config.height, fps = config.fps, total = config.durationInFrames
         guard w > 0, h > 0, fps > 0, total > 0 else {
             throw SprocketError(.export, "invalid composition size \(w)x\(h), \(fps) fps, \(total) frames")
@@ -91,6 +93,7 @@ enum ExportEngine {
                 let vq = DispatchQueue(label: "sprocket.export.video", qos: .userInitiated)
                 var next = 0
                 var rendered = 0
+                var last: CVPixelBuffer?
                 vInput.requestMediaDataWhenReady(on: vq) {
                     while vInput.isReadyForMoreMediaData {
                         if state.isFinished { return }
@@ -99,14 +102,22 @@ enum ExportEngine {
                         var failure: Error?
                         autoreleasepool {
                             do {
-                                guard let pool = adaptor.pixelBufferPool else { throw SprocketError(.export, "no pixel buffer pool") }
-                                var pbOut: CVPixelBuffer?
-                                let st = CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pbOut)
-                                guard st == kCVReturnSuccess, let pb = pbOut else { throw SprocketError(.export, "out of pixel buffers (\(st))") }
-                                tag709(pb)
-                                let image = try frame(next)
-                                SprocketRenderer.context.render(image, to: pb,
-                                                              bounds: CGRect(x: 0, y: 0, width: w, height: h), colorSpace: colorSpace)
+                                let pb: CVPixelBuffer
+                                if let image = try frame(next) ?? (last == nil ? CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: w, height: h)) : nil) {
+                                    guard let pool = adaptor.pixelBufferPool else { throw SprocketError(.export, "no pixel buffer pool") }
+                                    var pbOut: CVPixelBuffer?
+                                    let st = CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pbOut)
+                                    guard st == kCVReturnSuccess, let fresh = pbOut else { throw SprocketError(.export, "out of pixel buffers (\(st))") }
+                                    tag709(fresh)
+                                    SprocketRenderer.context.render(image, to: fresh,
+                                                                  bounds: CGRect(x: 0, y: 0, width: w, height: h), colorSpace: colorSpace)
+                                    pb = fresh
+                                    last = fresh
+                                    rendered += 1
+                                } else {
+                                    // The same picture as the frame before: write the last buffer again (the encoder only reads it).
+                                    pb = last!
+                                }
                                 let t = CMTime(value: CMTimeValue(next), timescale: CMTimeScale(fps))
                                 guard adaptor.append(pb, withPresentationTime: t) else {
                                     throw SprocketError(.export, "cannot append frame \(next): \(writer.error?.localizedDescription ?? "writer failed")")
@@ -116,8 +127,7 @@ enum ExportEngine {
                         }
                         if let failure { state.fail(failure); return }
                         next += 1
-                        rendered += 1
-                        if rendered % 120 == 0 { SprocketRenderer.context.clearCaches() }
+                        if rendered > 0 && rendered % 120 == 0 { SprocketRenderer.context.clearCaches() }
                         progress?(SprocketExporter.Progress(frame: next, total: total))
                     }
                 }
